@@ -102,6 +102,12 @@ namespace avdecc_lib
          * Process a CONTROLLER_AVAILABLE response for the CONTROLLER_AVAILABLE command.
          */
         int proc_controller_avail_resp(void *&notification_id, const uint8_t *frame, size_t frame_len, int &status);
+
+		/**
+		 * Send a VENDOR_UNIQUE command.
+		 */
+		int STDCALL send_vendor_unique_cmd(void *notification_id, uint32_t end_station_index, uint64_t protocol_id, uint8_t payload_specific_data[], uint32_t length);
+
     };
 
     extern controller_imp *controller_imp_ref;

@@ -61,6 +61,12 @@ namespace avdecc_lib
         {
             delete entity_desc_vec.at(entity_vec_index);
         }
+
+		/*for(uint32_t vu_resp_vec_index = 0; vu_resp_vec_index < vu_resp_vec.size(); vu_resp_vec_index++)
+		{
+			delete vu_resp_vec.at(vu_resp_vec_index);
+		}*/
+	
     }
 
     int end_station_imp::end_station_init()
@@ -1406,6 +1412,47 @@ namespace avdecc_lib
         return 0;
     }
 
+	int end_station_imp::proc_rcvd_vu_resp(void *&notification_id, const uint8_t *frame, size_t frame_len, int &status)
+	{
+		struct jdksavdecc_frame cmd_frame;
+		memcpy(cmd_frame.payload, frame, frame_len);
+
+		struct jdksavdecc_vendor_data data;
+		status = jdksavdecc_common_control_header_get_status(frame, ETHER_HDR_SIZE);
+
+		uint16_t sequence_id = jdksavdecc_aecpdu_vendor_get_sequence_id(frame, ETHER_HDR_SIZE);
+
+		jdksavdecc_eui48 protocol_id = jdksavdecc_aecpdu_vendor_get_protocol_id(frame, ETHER_HDR_SIZE);
+
+		const size_t payload_data_length = frame_len - ETHER_HDR_SIZE - JDKSAVDECC_AECP_VENDOR_LEN;
+		assert(payload_data_length <= 508);
+
+		std::vector<uint8_t> psd(payload_data_length);
+		for(size_t i = 0; i < payload_data_length; i++)
+		{
+			psd[i] = frame[ETHER_HDR_SIZE + JDKSAVDECC_AECP_VENDOR_LEN + i];
+		}
+
+		data.protocol_id = protocol_id;
+		data.payload_specific_data = psd;
+
+		vu_resp_vec.insert(vu_resp_vec.begin(), data);
+
+		uint8_t payload_specific_data[508];
+		memcpy(&payload_specific_data, &frame[ETHER_HDR_SIZE + JDKSAVDECC_AECP_VENDOR_LEN], payload_data_length);
+		//////////////////data checking
+		uint64_t proto64 = jdksavdecc_eui48_convert_to_uint64(&protocol_id);
+		log_imp_ref->post_log_msg(LOGGING_LEVEL_ERROR, "Vendor Unique Response Processor: stat %d, seq %d, proto %016llx, cdl %Iu", status, sequence_id, proto64, payload_data_length);
+		for(size_t i = 0; i < payload_data_length; i++)
+		{
+			log_imp_ref->post_log_msg(LOGGING_LEVEL_ERROR, "VURP: [%d] 0x%X\n", i, psd[i]);
+		}
+		//////////////////
+		aecp_controller_state_machine_ref->update_inflight_for_rcvd_resp(notification_id, JDKSAVDECC_AECP_MESSAGE_TYPE_VENDOR_UNIQUE_RESPONSE, false, &cmd_frame);
+		
+		return 0;
+	}
+
     int end_station_imp::proc_rcvd_aecp_aa_resp(void *&notification_id, const uint8_t *frame, size_t frame_len, int &status)
     {
         struct jdksavdecc_frame cmd_frame;
@@ -1570,4 +1617,42 @@ namespace avdecc_lib
     {
         return selected_config_index;
     }
+
+	uint32_t STDCALL end_station_imp::vu_resp_count(uint64_t protocol_id)
+	{
+		struct jdksavdecc_eui48 protocol_id_48;
+		jdksavdecc_eui48_init_from_uint64(&protocol_id_48, protocol_id);
+
+		size_t total = 0;
+		for(size_t i = 0; i < vu_resp_vec.size(); i++)
+		{
+			jdksavdecc_vendor_data data = vu_resp_vec.at(i);
+			if(jdksavdecc_eui48_compare(&data.protocol_id, &protocol_id_48) == 0)
+			{
+				total++;
+			}
+		}
+		return total;
+	}
+
+	std::vector<uint8_t> STDCALL end_station_imp::get_first_vu_resp(uint64_t protocol_id) 
+	{
+		struct jdksavdecc_eui48 protocol_id_48;
+		jdksavdecc_eui48_init_from_uint64(&protocol_id_48, protocol_id);
+		std::vector<uint8_t> data_payload;
+		if(vu_resp_vec.size() > 0)
+		{
+			for(uint32_t i = vu_resp_vec.size() - 1; i >= 0; i--)
+			{
+				jdksavdecc_vendor_data data = vu_resp_vec.at(i);
+				if(jdksavdecc_eui48_compare(&data.protocol_id, &protocol_id_48) == 0)
+				{
+					std::vector<jdksavdecc_vendor_data>::iterator j = vu_resp_vec.end();
+					vu_resp_vec.erase(vu_resp_vec.end() - 1 - i);
+					return data.payload_specific_data;
+				}
+			}
+		}
+		return data_payload;
+	}
 }

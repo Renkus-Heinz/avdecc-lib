@@ -97,6 +97,11 @@ namespace avdecc_lib
          * Send a CONTROLLER_AVAILABLE command to verify that the AVDECC Controller is still there.
          */
         AVDECC_CONTROLLER_LIB32_API virtual int STDCALL send_controller_avail_cmd(void *notification_id, uint32_t end_station_index) = 0;
+
+		/**
+         * Send a VENDOR_UNIQUE command.
+         */
+        AVDECC_CONTROLLER_LIB32_API virtual int STDCALL send_vendor_unique_cmd(void *notification_id, uint32_t end_station_index, uint64_t protocol_id, uint8_t payload_specific_data[], uint32_t length) = 0;
     };
 
     /**

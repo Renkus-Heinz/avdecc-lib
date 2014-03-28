@@ -30,6 +30,7 @@
 #pragma once
 
 #include "entity_descriptor_imp.h"
+#include "jdksavdecc_aecp_vendor.h"
 #include "end_station.h"
 
 namespace avdecc_lib
@@ -112,7 +113,7 @@ namespace avdecc_lib
 
         adp *adp_ref; // ADP associated with the End Station
         std::vector<entity_descriptor_imp *> entity_desc_vec; // Store a list of ENTITY descriptor objects
-
+		std::vector<struct jdksavdecc_vendor_data> vu_resp_vec ; // Store a list of VENDOR UNIQUE responses
     public:
         end_station_imp(const uint8_t *frame, size_t frame_len);
         virtual ~end_station_imp();
@@ -160,11 +161,15 @@ namespace avdecc_lib
 
         int proc_rcvd_acmp_resp(uint32_t msg_type, void *&notification_id, const uint8_t *frame, size_t frame_len, int &status);
 
+		int proc_rcvd_vu_resp(void *&notification_id, const uint8_t *frame, size_t frame_len, int &status);
+
         void STDCALL set_current_entity_index(uint16_t entity_index);
         uint16_t STDCALL get_current_entity_index() const;
         void STDCALL set_current_config_index(uint16_t entity_index);
         uint16_t STDCALL get_current_config_index() const;
-
+		
+		uint32_t STDCALL vu_resp_count(uint64_t protocol_id);
+		std::vector<uint8_t> STDCALL get_first_vu_resp(uint64_t protocol_id);
     private:
         /**
          * Initialize End Station with Entity and Configuration descriptors information.

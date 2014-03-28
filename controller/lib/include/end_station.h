@@ -1,4 +1,4 @@
-/*
+ /*
  * Licensed under the MIT License (MIT)
  *
  * Copyright (c) 2013 AudioScience Inc.
@@ -119,6 +119,16 @@ namespace avdecc_lib
          * \return The index of the currently selected config.
          */
         AVDECC_CONTROLLER_LIB32_API virtual uint16_t STDCALL get_current_config_index() const = 0;
+
+		/**
+		 * \return The number of Vendor Unique responses in this End Station's queue for a particular protocol_id.
+		 */
+		AVDECC_CONTROLLER_LIB32_API virtual uint32_t STDCALL vu_resp_count(uint64_t protocol_id) = 0;
+
+		/**
+		 * \return Dequeue the first Vendor Unique response of a given protocol_id.
+		 */
+		AVDECC_CONTROLLER_LIB32_API virtual std::vector<uint8_t> STDCALL get_first_vu_resp(uint64_t protocol_id) = 0;
     };
 }
 

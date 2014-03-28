@@ -378,7 +378,13 @@ namespace avdecc_lib
                             is_notification_id_valid = true;
                             break;
                         }
+						case JDKSAVDECC_AECP_MESSAGE_TYPE_VENDOR_UNIQUE_RESPONSE:
+						{
+							end_station_vec.at(found_end_station_index)->proc_rcvd_vu_resp(notification_id, frame, frame_len, status);
 
+							is_notification_id_valid = true;
+							break;
+						}
                     }
                 }
                 break;
@@ -511,6 +517,50 @@ namespace avdecc_lib
         u_field = aem_cmd_controller_avail_resp.aem_header.command_type >> 15 & 0x01; // u_field = the msb of the uint16_t command_type
 
         aecp_controller_state_machine_ref->update_inflight_for_rcvd_resp(notification_id, msg_type, u_field, &cmd_frame);
+
+        return 0;
+    }
+
+	int STDCALL controller_imp::send_vendor_unique_cmd(void *notification_id, uint32_t end_station_index, uint64_t protocol_id, uint8_t payload_specific_data[], uint32_t length)
+    {
+        struct jdksavdecc_frame cmd_frame;
+		struct jdksavdecc_aecpdu_vendor vendor_cmd;
+		ssize_t vendor_cmd_returned;
+		//log_imp_ref->post_log_msg(LOGGING_LEVEL_DEBUG, "PAYLOAD LENGTH: %d\n", length);
+
+		struct jdksavdecc_eui48 protocol_id_48;
+		jdksavdecc_eui48_init_from_uint64(&protocol_id_48, protocol_id);
+
+        vendor_cmd.aecpdu_header.controller_entity_id = end_station_vec.at(end_station_index)->get_adp()->get_controller_entity_id();
+		vendor_cmd.aecpdu_header.sequence_id = 0;
+		vendor_cmd.protocol_id = protocol_id_48;
+		//vendor_cmd.payload_specific_data = payload_specific_data;
+
+		aecp_controller_state_machine_ref->ether_frame_init(end_station_vec.at(end_station_index)->mac(),
+															&cmd_frame,
+															ETHER_HDR_SIZE + JDKSAVDECC_AECP_VENDOR_LEN + length);
+        
+		vendor_cmd_returned = jdksavdecc_aecpdu_vendor_write(&vendor_cmd,
+																cmd_frame.payload,
+																ETHER_HDR_SIZE,
+																sizeof(cmd_frame.payload));
+		
+        if(vendor_cmd_returned < 0)
+        {
+            log_imp_ref->post_log_msg(LOGGING_LEVEL_ERROR, "aecpdu_vendor_write error\n");
+            assert(vendor_cmd_returned >= 0);
+            return -1;
+        }
+
+		memcpy(&cmd_frame.payload[ETHER_HDR_SIZE + JDKSAVDECC_AECP_VENDOR_LEN], payload_specific_data, length);
+
+        aecp_controller_state_machine_ref->common_hdr_init(JDKSAVDECC_AECP_MESSAGE_TYPE_VENDOR_UNIQUE_COMMAND,
+                                                            &cmd_frame,
+                                                            end_station_vec.at(end_station_index)->entity_id(),
+                                                            JDKSAVDECC_AECP_VENDOR_LEN + length - 
+                                                            JDKSAVDECC_COMMON_CONTROL_HEADER_LEN);
+
+        system_queue_tx(notification_id, CMD_WITH_NOTIFICATION, cmd_frame.payload, cmd_frame.length);
 
         return 0;
     }
